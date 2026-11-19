@@ -1,10 +1,22 @@
+from ..config import llm_enabled
 from ..types import Passage
+from .index import VectorIndex, load_documents
 
 
 def retrieve(query: str, product_id: str | None = None, k: int = 4) -> list[Passage]:
-    """Return the most relevant passages from product manuals and policy documents.
+    """Return up to k passages from applicable product manuals and policies."""
+    query = query.strip()
+    if not query or k <= 0 or not llm_enabled():
+        return []
 
-    CONTRACT: keep this signature. The RAG owner replaces the body (chunking, embeddings,
-    vector store, ranking) and puts the source documents in data/docs/.
-    """
-    return []  # TODO(RAG owner)
+    documents = load_documents()
+    if not documents:
+        return []
+
+    from openai import OpenAIError
+
+    try:
+        return VectorIndex.for_documents(documents).search(query, product_id, k)
+    except OpenAIError:
+        # Let the existing empty-context response handle embedding outages.
+        return []
